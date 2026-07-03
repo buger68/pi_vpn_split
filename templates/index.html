@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DNS-VPN Gateway</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f172a; color: #e2e8f0; min-height: 100vh;
+        }
+        .container { max-width: 1100px; margin: 0 auto; padding: 20px; }
+        h1 {
+            text-align: center; padding: 30px 0 10px; font-size: 2em;
+            background: linear-gradient(135deg, #38bdf8, #818cf8);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        }
+        .subtitle { text-align: center; color: #94a3b8; margin-bottom: 30px; font-size: 0.9em; }
+        .card {
+            background: #1e293b; border-radius: 12px; padding: 24px; margin-bottom: 24px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.3); border: 1px solid #334155;
+        }
+        .card h2 { font-size: 1.2em; margin-bottom: 16px; color: #38bdf8; }
+        .input-group { display: flex; gap: 10px; margin-bottom: 16px; }
+        .input-group input {
+            flex: 1; padding: 10px 14px; border: 1px solid #334155; border-radius: 8px;
+            background: #0f172a; color: #e2e8f0; font-size: 14px; outline: none;
+        }
+        .input-group input:focus { border-color: #38bdf8; }
+        .btn {
+            padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer;
+            font-size: 14px; font-weight: 600; transition: all 0.2s; white-space: nowrap;
+        }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-primary { background: #38bdf8; color: #0f172a; }
+        .btn-primary:hover:not(:disabled) { background: #7dd3fc; }
+        .btn-success { background: #10b981; color: white; }
+        .btn-danger { background: #ef4444; color: white; }
+        .btn-warning { background: #f59e0b; color: #0f172a; }
+        .btn-sm { padding: 6px 12px; font-size: 12px; }
+        .btn-outline { background: transparent; border: 1px solid #475569; color: #94a3b8; }
+        .btn-outline:hover { border-color: #38bdf8; color: #38bdf8; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 10px 12px; border-bottom: 1px solid #334155; text-align: left; }
+        th { color: #94a3b8; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em; }
+        tr:hover { background: #1a2332; }
+        .ip-list { display: flex; flex-wrap: wrap; gap: 4px; }
+        .ip-badge {
+            background: #0f172a; padding: 2px 8px; border-radius: 4px; font-size: 12px;
+            font-family: 'Courier New', monospace; color: #a5b4fc;
+        }
+        .empty-state { text-align: center; padding: 30px; color: #64748b; }
+        .status-bar {
+            display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px;
+            padding: 10px 0; color: #94a3b8; font-size: 0.85em;
+        }
+        .status-bar span { color: #38bdf8; font-weight: 600; }
+        .alert {
+            padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; display: none;
+        }
+        .alert-success { background: #065f46; color: #6ee7b7; display: block; }
+        .alert-error { background: #7f1d1d; color: #fca5a5; display: block; }
+        .tab {
+            display: inline-block; padding: 10px 20px; cursor: pointer;
+            border-bottom: 2px solid transparent; transition: all 0.2s;
+            color: #64748b; font-weight: 500;
+        }
+        .tab.active { color: #38bdf8; border-bottom-color: #38bdf8; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .domain-cell { font-family: 'Courier New', monospace; font-weight: 500; }
+        .hint { font-size: 0.8em; color: #64748b; margin-top: -10px; margin-bottom: 16px; }
+        .route-cell { font-family: 'Courier New', monospace; font-size: 13px; }
+        .mono { font-family: 'Courier New', monospace; }
+        .config-editor {
+            width: 100%; min-height: 250px; padding: 14px; border: 1px solid #334155; border-radius: 8px;
+            background: #0f172a; color: #a5b4fc; font-family: 'Courier New', monospace;
+            font-size: 13px; outline: none; resize: vertical; tab-size: 2;
+        }
+        .config-editor:focus { border-color: #38bdf8; }
+        .wg-status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+        .wg-stat { background: #0f172a; border-radius: 8px; padding: 12px 16px; }
+        .wg-stat-label { font-size: 0.75em; color: #64748b; text-transform: uppercase; }
+        .wg-stat-value { font-size: 1.1em; font-weight: 600; margin-top: 4px; }
+        .wg-status-on { color: #10b981; }
+        .wg-status-off { color: #ef4444; }
+        .btn-group { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+        .wg-detail-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 13px; border-bottom: 1px solid #1e293b; }
+        .wg-detail-label { color: #64748b; }
+        .wg-detail-value { color: #a5b4fc; word-break: break-all; }
+        .edit-port { width: 100px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 4px 8px; color: #e2e8f0; text-align: right; font-family: 'Courier New', monospace; }
+        .edit-port:focus { border-color: #38bdf8; outline: none; }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>🌐 DNS-VPN Gateway</h1>
+    <p class="subtitle">Управление доменами для маршрутизации через WireGuard</p>
+    <div id="alert" class="alert"></div>
+    <div class="status-bar" id="status-bar">
+        <div>Домены: <span id="domains-count">0</span></div>
+        <div>Маршруты: <span id="routes-count">0</span></div>
+        <div>WG статус: <span id="wg-status-label">...</span></div>
+    </div>
+    <div class="card" style="padding-bottom:0">
+        <div class="tabs">
+            <span class="tab active" onclick="switchTab('domains',this)">📋 Домены</span>
+            <span class="tab" onclick="switchTab('routes',this)">🛣️ Маршруты</span>
+            <span class="tab" onclick="switchTab('wg',this);loadWGStatus()">🔐 WireGuard</span>
+            <span class="tab" onclick="switchTab('settings',this)">⚙️ Настройки</span>
+        </div>
+    </div>
+
+    <!-- Домены -->
+    <div id="tab-domains" class="tab-content active">
+        <div class="card">
+            <h2>🔗 Добавить домен</h2>
+            <div class="input-group">
+                <input type="text" id="domain-input" placeholder="example.com" onkeydown="if(event.key==='Enter')addDomain()">
+                <button class="btn btn-primary" onclick="addDomain()">Добавить</button>
+            </div>
+            <p class="hint">wildcard: *.example.com</p>
+        </div>
+        <div class="card">
+            <h2>🚀 Пресеты</h2>
+            <div id="presets-buttons" class="btn-group" style="margin-bottom:0"></div>
+            <p class="hint" style="margin-top:8px">YouTube / Telegram / ChatGPT</p>
+        </div>
+        <div class="card">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h2 style="margin:0">📋 Список</h2>
+                <div class="btn-group" style="margin:0">
+                    <button class="btn btn-sm btn-outline" onclick="exportDomains()">📥 Экспорт доменов</button>
+                    <button class="btn btn-sm btn-outline" onclick="document.getElementById('import-file').click()">📤 Импорт</button>
+                    <input type="file" id="import-file" accept=".json" style="display:none" onchange="importDomains(event)">
+                </div>
+            </div>
+            <table><thead><tr><th>Домен</th><th>IP</th><th></th></tr></thead>
+            <tbody id="domains-tbody"><tr><td colspan="3" class="empty-state">Нет доменов</td></tr></tbody></table>
+        </div>
+    </div>
+
+    <!-- Маршруты -->
+    <div id="tab-routes" class="tab-content">
+        <div class="card">
+            <h2>🛣️ Активные маршруты</h2>
+            <p class="hint" style="margin-top:-12px">Точечные маршруты к IP управляемых доменов через wg0</p>
+            <table><thead><tr><th>IP-адрес</th><th>Интерфейс</th></tr></thead>
+            <tbody id="routes-tbody"><tr><td colspan="2" class="empty-state">Нет маршрутов</td></tr></tbody></table>
+        </div>
+    </div>
+
+    <!-- WireGuard -->
+    <div id="tab-wg" class="tab-content">
+        <div class="card">
+            <h2>🔐 Статус</h2>
+            <div class="wg-status-grid">
+                <div class="wg-stat"><div class="wg-stat-label">Статус</div><div id="wg-up" class="wg-stat-value wg-status-off">⏳</div></div>
+                <div class="wg-stat"><div class="wg-stat-label">Интерфейс</div><div id="wg-iface" class="wg-stat-value mono">wg0</div></div>
+                <div class="wg-stat"><div class="wg-stat-label">Есть конфиг</div><div id="wg-has-config" class="wg-stat-value">...</div></div>
+                <div class="wg-stat"><div class="wg-stat-label">Default через WG</div><div id="wg-default-route" class="wg-stat-value">...</div></div>
+            </div>
+            <div id="wg-detail"></div>
+            <div class="btn-group">
+                <button id="btn-wg-start" class="btn btn-success btn-sm" onclick="wgAction('start')">▶ Запустить</button>
+                <button id="btn-wg-stop" class="btn btn-danger btn-sm" onclick="wgAction('stop')">⏹ Остановить</button>
+                <button id="btn-wg-restart" class="btn btn-warning btn-sm" onclick="wgAction('restart')">🔄 Перезапустить</button>
+            </div>
+        </div>
+        <div class="card">
+            <h2>⚙️ Конфиг</h2>
+            <textarea id="wg-config-editor" class="config-editor" spellcheck="false"></textarea>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="saveWGConfig()">💾 Сохранить</button>
+                <button class="btn btn-sm btn-outline" onclick="reloadWGConfig()">↻ Перезагрузить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Настройки -->
+    <div id="tab-settings" class="tab-content">
+        <div class="card">
+            <h2>⚙️ Порты</h2>
+            <div class="wg-detail-row"><span class="wg-detail-label">DNS порт (upstream)</span><input type="number" id="edit-dns-port" class="edit-port" value="5353"></div>
+            <div class="wg-detail-row"><span class="wg-detail-label">Веб порт</span><input type="number" id="edit-web-port" class="edit-port" value="3001"></div>
+            <div class="wg-detail-row"><span class="wg-detail-label">VPN интерфейс</span><span class="wg-detail-value" style="color:#10b981" id="set-vpn-iface">wg0</span></div>
+            <div class="btn-group"><button class="btn btn-primary btn-sm" onclick="savePortSettings()">💾 Сохранить порты</button><span style="color:#64748b;font-size:12px;padding:8px 0">(требует перезапуска)</span></div>
+        </div>
+        <div class="card">
+            <h2>💾 Экспорт/Импорт доменов</h2>
+            <div class="btn-group">
+                <button class="btn btn-outline btn-sm" onclick="exportDomains()">📥 JSON доменов</button>
+                <button class="btn btn-outline btn-sm" onclick="document.getElementById('import-file2').click()">📤 JSON доменов</button>
+                <input type="file" id="import-file2" accept=".json" style="display:none" onchange="importDomains(event)">
+            </div>
+        </div>
+        <div class="card">
+            <h2>📦 Полный бэкап</h2>
+            <p class="hint" style="margin-top:-12px">WG конфиг + домены + IP + настройки</p>
+            <div class="btn-group">
+                <button class="btn btn-primary" onclick="exportFullBackup()">📥 Скачать бэкап</button>
+                <button class="btn btn-warning" onclick="document.getElementById('backup-file').click()">📤 Восстановить из бэкапа</button>
+                <input type="file" id="backup-file" accept=".json" style="display:none" onchange="importFullBackup(event)">
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+async function api(url,method='GET',body=null) {
+    let o={method:method,headers:{'Content-Type':'application/json'}};
+    if(body) o.body=JSON.stringify(body);
+    return await(await fetch(url,o)).json();
+}
+function showAlert(msg,t='success') {
+    let el=document.getElementById('alert');
+    el.textContent=msg;el.className='alert alert-'+t;el.style.display='block';
+    setTimeout(()=>el.style.display='none',4000);
+}
+function switchTab(tab,el) {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+    document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+    el.classList.add('active');
+    document.getElementById('tab-'+tab).classList.add('active');
+    if(tab==='settings')loadSettings();
+}
+function esc(s){return s.replace(/&/g,'&').replace(/</g,'<').replace(/>/g,'>').replace(/"/g,'"');}
+
+// Домены
+async function addDomain() {
+    let v=document.getElementById('domain-input').value.trim();
+    if(!v){showAlert('Введите домен','error');return;}
+    let r=await api('/api/domains/add','POST',{domain:v});
+    if(r.error)showAlert(r.error,'error');
+    else{showAlert('Домен '+v+' добавлен');document.getElementById('domain-input').value='';loadData();}
+}
+async function removeDomain(d) {
+    if(!confirm('Удалить '+d+'?'))return;
+    let r=await api('/api/domains/remove','POST',{domain:d});
+    r.status==='ok'?(showAlert('Домен '+d+' удалён'),loadData()):showAlert(r.error,'error');
+}
+async function exportDomains() {
+    let d=await api('/api/domains/export');
+    let b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    let a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download='dns_vpn_domains_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+}
+async function importDomains(e) {
+    let f=e.target.files[0];if(!f)return;
+    try{let t=await f.text(),d=JSON.parse(t),r=await api('/api/domains/import','POST',d);
+    r.status==='ok'?(showAlert('Импортировано '+r.added+' доменов'),loadData()):showAlert(r.error,'error');}
+    catch(e){showAlert('Ошибка: '+e,'error');}
+    e.target.value='';
+}
+
+// Полный бэкап
+async function exportFullBackup() {
+    let d=await api('/api/backup/export');
+    let b=new Blob([JSON.stringify(d,null,2)],{type:'application/json'});
+    let a=document.createElement('a');a.href=URL.createObjectURL(b);
+    a.download='dns_vpn_backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();
+    showAlert('Бэкап скачан');
+}
+async function importFullBackup(e) {
+    let f=e.target.files[0];if(!f)return;
+    try{
+        let t=await f.text(),d=JSON.parse(t);
+        if(!d.version||!d.domains){showAlert('Неверный формат бэкапа','error');return;}
+        let r=await api('/api/backup/import','POST',d);
+        r.status==='ok'?(showAlert(r.message),loadData(),loadWGConfig()):showAlert(r.error||'Ошибка','error');
+    }catch(e){showAlert('Ошибка: '+e,'error');}
+    e.target.value='';
+}
+
+// Настройки портов
+async function loadSettings() {
+    let s=await api('/api/settings');
+    document.getElementById('edit-dns-port').value=s.dns_port||5353;
+    document.getElementById('edit-web-port').value=s.web_port||3001;
+    document.getElementById('set-vpn-iface').textContent=s.vpn_interface||'wg0';
+}
+async function savePortSettings() {
+    let dns=document.getElementById('edit-dns-port').value;
+    let web=document.getElementById('edit-web-port').value;
+    let r=await api('/api/settings','POST',{dns_port:parseInt(dns),web_port:parseInt(web)});
+    r.status==='ok'?showAlert('Сохранено. Перезапустите сервис.'):showAlert(r.error,'error');
+}
+
+// WG
+async function loadWGConfig(){try{let d=await api('/api/wg/config');document.getElementById('wg-config-editor').value=d.config||'# error';}catch(e){}}
+async function reloadWGConfig(){await loadWGConfig();showAlert('Конфиг перезагружен');}
+async function saveWGConfig(){
+    let c=document.getElementById('wg-config-editor').value,r=await api('/api/wg/config','POST',{config:c});
+    r.error?showAlert(r.error,'error'):(showAlert('Конфиг сохранён'),loadWGStatus());
+}
+async function loadWGStatus(){
+    try{
+        let s=await api('/api/wg/status');
+        let up=document.getElementById('wg-up');
+        up.textContent=s.up?'✅ Активен':'❌ Остановлен';
+        up.className='wg-stat-value '+(s.up?'wg-status-on':'wg-status-off');
+        document.getElementById('wg-iface').textContent=s.interface||'wg0';
+        document.getElementById('wg-has-config').textContent=s.has_config?'✅ Да':'❌ Нет';
+        let dr=document.getElementById('wg-default-route');
+        if(s.default_via_wg){dr.textContent='⚠️ Есть';dr.style.color='#f59e0b';}
+        else{dr.textContent='✅ Нет';dr.style.color='#10b981';}
+        let de=document.getElementById('wg-detail');
+        if(s.detail&&Object.keys(s.detail).length>0){
+            let h='<h3 style="color:#94a3b8;font-size:0.9em;margin:12px 0 8px">Детали:</h3>';
+            for(let[k,v]of Object.entries(s.detail)){if(k==='peers')continue;h+='<div class="wg-detail-row"><span class="wg-detail-label">'+esc(k)+'</span><span class="wg-detail-value mono">'+esc(String(v))+'</span></div>';}
+            if(s.detail.peers&&s.detail.peers.length>0)h+='<div style="margin-top:8px;color:#94a3b8;font-size:0.85em">Пиров: '+s.detail.peers.length+'</div>';
+            de.innerHTML=h;
+        } else de.innerHTML='<div style="color:#64748b;font-size:0.9em;margin-top:8px">Нет данных</div>';
+        document.getElementById('btn-wg-start').disabled=s.up;
+        document.getElementById('btn-wg-stop').disabled=!s.up;
+        document.getElementById('btn-wg-restart').disabled=!s.has_config;
+    }catch(e){}
+}
+async function wgAction(a){
+    let act={start:'запущен',stop:'остановлен',restart:'перезапущен'};
+    let r=await api('/api/wg/'+a,'POST');
+    r.error?showAlert('Ошибка: '+r.error,'error'):(showAlert('WireGuard '+act[a]),loadWGStatus(),loadData());
+}
+
+// Пресеты
+async function loadPresets(){
+    try{
+        let p=await api('/api/presets');
+        document.getElementById('presets-buttons').innerHTML=Object.entries(p).map(([id,name])=>'<button class="btn btn-success btn-sm" onclick="applyPreset(\''+id+'\')">+ '+name+'</button> <button class="btn btn-danger btn-sm" onclick="removePreset(\''+id+'\')">- '+name+'</button>').join('');
+    }catch(e){}
+}
+async function applyPreset(id){
+    let r=await api('/api/presets/'+id+'/apply','POST');
+    r.status==='ok'?(showAlert('Пресет '+r.name+' ('+r.added+' доменов)'),loadData()):showAlert(r.error||'?','error');
+}
+async function removePreset(id){
+    if(!confirm('Удалить домены этого пресета?'))return;
+    let r=await api('/api/presets/'+id+'/remove','POST');
+    r.status==='ok'?(showAlert('Пресет '+r.name+' ('+r.removed+' доменов)'),loadData()):showAlert(r.error||'?','error');
+}
+
+// Загрузка данных
+async function loadData(){
+    try{
+        let[domains,routes,status]=await Promise.all([api('/api/domains'),api('/api/routes'),api('/api/status')]);
+        document.getElementById('domains-count').textContent=status.domains_count;
+        document.getElementById('routes-count').textContent=status.routes_count;
+        let wl=document.getElementById('wg-status-label');
+        if(status.wg_up){wl.textContent='✅ Активен';wl.style.color='#10b981';}
+        else{wl.textContent='❌ Остановлен';wl.style.color='#ef4444';}
+        let tb=document.getElementById('domains-tbody'),dk=Object.keys(domains);
+        if(!dk.length)tb.innerHTML='<tr><td colspan="3" class="empty-state">Нет доменов</td></tr>';
+        else tb.innerHTML=dk.map(d=>'<tr><td class="domain-cell">'+esc(d)+'</td><td>'+(domains[d].length?domains[d].map(ip=>'<span class="ip-badge">'+ip+'</span>').join(''):'<span style="color:#64748b;font-size:12px">ожидание</span>')+'</td><td><button class="btn btn-danger btn-sm" onclick="removeDomain(\''+esc(d)+'\')">Удалить</button></td></tr>').join('');
+        let rt=document.getElementById('routes-tbody');
+        if(!routes.routes||!routes.routes.length)rt.innerHTML='<tr><td colspan="2" class="empty-state">Нет маршрутов</td></tr>';
+        else rt.innerHTML=routes.routes.map(ip=>'<tr><td class="route-cell">'+ip+'</td><td class="route-cell">'+status.vpn_interface+'</td></tr>').join('');
+    }catch(e){}
+}
+
+loadData();loadWGConfig();loadPresets();setInterval(loadData,5000);
+</script>
+</body>
+</html>

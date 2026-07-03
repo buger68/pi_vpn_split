@@ -1,0 +1,2 @@
+flask>=2.3.0
+dnspython>=2.4.0
