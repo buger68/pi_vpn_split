@@ -48,7 +48,7 @@
         .ip-list { display: flex; flex-wrap: wrap; gap: 4px; }
         .ip-badge {
             background: #0f172a; padding: 2px 8px; border-radius: 4px; font-size: 12px;
-            font-family: 'Courier New', monospace; color: #a5b4fc;
+            font-family: 'Courier New', monospace; color: #a5b4fc; cursor: default;
         }
         .empty-state { text-align: center; padding: 30px; color: #64748b; }
         .status-bar {
@@ -91,6 +91,12 @@
         .wg-detail-value { color: #a5b4fc; word-break: break-all; }
         .edit-port { width: 100px; background: #0f172a; border: 1px solid #334155; border-radius: 4px; padding: 4px 8px; color: #e2e8f0; text-align: right; font-family: 'Courier New', monospace; }
         .edit-port:focus { border-color: #38bdf8; outline: none; }
+        .tooltip { position: relative; }
+        .tooltip:hover:after {
+            content: attr(data-tip); position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%);
+            background: #1e293b; color: #94a3b8; padding: 4px 8px; border-radius: 4px; font-size: 11px;
+            white-space: nowrap; border: 1px solid #334155; z-index: 10;
+        }
     </style>
 </head>
 <body>
@@ -341,9 +347,11 @@ async function removePreset(id){
 }
 
 // Загрузка данных
+let detailCache = {};
 async function loadData(){
     try{
-        let[domains,routes,status]=await Promise.all([api('/api/domains'),api('/api/routes'),api('/api/status')]);
+        let[domains,routes,status,detail]=await Promise.all([api('/api/domains'),api('/api/routes'),api('/api/status'),api('/api/domains/detail')]);
+        detailCache = detail;
         document.getElementById('domains-count').textContent=status.domains_count;
         document.getElementById('routes-count').textContent=status.routes_count;
         let wl=document.getElementById('wg-status-label');
@@ -351,7 +359,19 @@ async function loadData(){
         else{wl.textContent='❌ Остановлен';wl.style.color='#ef4444';}
         let tb=document.getElementById('domains-tbody'),dk=Object.keys(domains);
         if(!dk.length)tb.innerHTML='<tr><td colspan="3" class="empty-state">Нет доменов</td></tr>';
-        else tb.innerHTML=dk.map(d=>'<tr><td class="domain-cell">'+esc(d)+'</td><td><div class="ip-list">'+(domains[d].length?domains[d].map(ip=>'<span class="ip-badge">'+ip+'</span>').join(''):'<span style="color:#64748b;font-size:12px">ожидание</span>')+'</div></td><td><button class="btn btn-danger btn-sm" onclick="removeDomain(\''+esc(d)+'\')">Удалить</button></td></tr>').join('');
+        else tb.innerHTML=dk.map(d=>{
+            let ipsHtml = domains[d].length
+                ? domains[d].map(ip=>{
+                    let tip = '';
+                    if(detail[d] && detail[d][ip]) {
+                        let m = detail[d][ip];
+                        tip = 'TTL: '+m.ttl+'s, last: '+m.last_resolved_ago;
+                    }
+                    return '<span class="ip-badge tooltip" data-tip="'+esc(tip)+'">'+ip+'</span>';
+                }).join('')
+                : '<span style="color:#64748b;font-size:12px">ожидание</span>';
+            return '<tr><td class="domain-cell">'+esc(d)+'</td><td><div class="ip-list">'+ipsHtml+'</div></td><td><button class="btn btn-danger btn-sm" onclick="removeDomain(\''+esc(d)+'\')">Удалить</button></td></tr>';
+        }).join('');
         let rt=document.getElementById('routes-tbody');
         if(!routes.routes||!routes.routes.length)rt.innerHTML='<tr><td colspan="2" class="empty-state">Нет маршрутов</td></tr>';
         else rt.innerHTML=routes.routes.map(ip=>'<tr><td class="route-cell">'+ip+'</td><td class="route-cell">'+status.vpn_interface+'</td></tr>').join('');

@@ -7,6 +7,7 @@ from wg_manager import WireGuardManager
 import subprocess
 import json
 import os
+import time
 
 app = Flask(__name__)
 
@@ -47,6 +48,31 @@ def api_list_domains():
     for d in domains:
         ips = domain_store.get_domain_ips(d)
         result[d] = ips
+    return jsonify(result)
+
+
+@app.route("/api/domains/detail", methods=["GET"])
+def api_list_domains_detail():
+    """Вернуть домены с мета-данными IP (ttl, last_resolved)"""
+    domains = domain_store.list_domains()
+    result = {}
+    now = time.time()
+    for d in domains:
+        ips_meta = domain_store.get_domain_ips_with_meta(d)
+        result[d] = {}
+        for ip, meta in ips_meta.items():
+            last_resolved = meta.get("last_resolved", 0)
+            ttl = meta.get("ttl", 300)
+            # человекочитаемое время
+            if last_resolved > 0:
+                age = int(now - last_resolved)
+                result[d][ip] = {
+                    "ttl": ttl,
+                    "age_sec": age,
+                    "last_resolved_ago": f"{age // 60}m {age % 60}s ago" if age < 3600 else f"{age // 3600}h {(age % 3600) // 60}m ago"
+                }
+            else:
+                result[d][ip] = {"ttl": ttl, "age_sec": 0, "last_resolved_ago": "not resolved"}
     return jsonify(result)
 
 
@@ -209,14 +235,12 @@ def api_save_settings():
     new_dns = data.get("dns_port", DNS_PORT)
     new_web = data.get("web_port", WEB_PORT)
     
-    # Читаем текущий config.py и заменяем порты
     try:
         with open(CONFIG_FILE, "r") as f:
             content = f.read()
     except:
         return jsonify({"error": "Не удалось прочитать config.py"}), 500
     
-    # Замена значений
     import re
     content = re.sub(r'WEB_PORT\s*=\s*int\(os\.getenv\("WEB_PORT",\s*"[^"]*"\)\)',
                      f'WEB_PORT = int(os.getenv("WEB_PORT", "{new_web}"))', content)
@@ -267,14 +291,12 @@ def api_backup_import():
     
     results = {"domains_added": 0, "wg_config_loaded": False}
     
-    # Импорт WireGuard конфига
     if "wireguard_config" in data and data["wireguard_config"]:
         if wg_manager:
             success, error = wg_manager.save_config(data["wireguard_config"])
             if success:
                 results["wg_config_loaded"] = True
     
-    # Импорт доменов
     if "domains" in data and isinstance(data["domains"], dict):
         for domain in data["domains"]:
             domain = domain.strip().lower()
