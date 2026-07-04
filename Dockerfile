@@ -4,6 +4,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wireguard-tools \
     iproute2 \
     ipset \
+    iptables \
     nftables \
     openresolv \
     procps \
