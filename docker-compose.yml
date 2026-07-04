@@ -1,31 +1,21 @@
-version: "3.9"
-
 services:
   # DNS-VPN Gateway: DNS upstream + точечная маршрутизация через WG
   dns-vpn-gateway:
-    build: .
+    image: ghcr.io/buger68/pi_vpn_split:latest
+    # build: .   # раскомментируй для локальной сборки
     container_name: dns-vpn-gateway
     network_mode: host
     privileged: true
-    cap_add:
-      - NET_ADMIN
-      - SYS_MODULE
+    entrypoint: ["python", "main.py"]
     environment:
       - DNS_PORT=5353
       - WEB_PORT=3001
       - WEB_HOST=0.0.0.0
       - VPN_INTERFACE=wg0
-      # WG_CONFIG можно передать через .env файл:
-      # WG_CONFIG=...
     volumes:
       - ./domains.json:/app/domains.json
-      - /etc/wireguard:/etc/wireguard:ro
+      - /etc/wireguard:/etc/wireguard
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   # AdGuard Home: DNS-фильтрация (на порту :53, веб на :3000)
   adguard-home:
@@ -35,12 +25,8 @@ services:
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - NET_BIND_SERVICE
     volumes:
       - ./adguard-work:/opt/adguardhome/work
       - ./adguard-conf:/opt/adguardhome/conf
     restart: unless-stopped
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
