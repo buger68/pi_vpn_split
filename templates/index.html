@@ -351,7 +351,7 @@ async function loadData(){
         else{wl.textContent='❌ Остановлен';wl.style.color='#ef4444';}
         let tb=document.getElementById('domains-tbody'),dk=Object.keys(domains);
         if(!dk.length)tb.innerHTML='<tr><td colspan="3" class="empty-state">Нет доменов</td></tr>';
-        else tb.innerHTML=dk.map(d=>'<tr><td class="domain-cell">'+esc(d)+'</td><td>'+(domains[d].length?domains[d].map(ip=>'<span class="ip-badge">'+ip+'</span>').join(''):'<span style="color:#64748b;font-size:12px">ожидание</span>')+'</td><td><button class="btn btn-danger btn-sm" onclick="removeDomain(\''+esc(d)+'\')">Удалить</button></td></tr>').join('');
+        else tb.innerHTML=dk.map(d=>'<tr><td class="domain-cell">'+esc(d)+'</td><td><div class="ip-list">'+(domains[d].length?domains[d].map(ip=>'<span class="ip-badge">'+ip+'</span>').join(''):'<span style="color:#64748b;font-size:12px">ожидание</span>')+'</div></td><td><button class="btn btn-danger btn-sm" onclick="removeDomain(\''+esc(d)+'\')">Удалить</button></td></tr>').join('');
         let rt=document.getElementById('routes-tbody');
         if(!routes.routes||!routes.routes.length)rt.innerHTML='<tr><td colspan="2" class="empty-state">Нет маршрутов</td></tr>';
         else rt.innerHTML=routes.routes.map(ip=>'<tr><td class="route-cell">'+ip+'</td><td class="route-cell">'+status.vpn_interface+'</td></tr>').join('');

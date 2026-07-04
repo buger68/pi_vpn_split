@@ -17,3 +17,6 @@ domains.json
 # OS
 .DS_Store
 Thumbs.db
+
+# AI Prompts (local development context)
+.gcprompts/
