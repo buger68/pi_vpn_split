@@ -55,6 +55,34 @@ class DNSServer:
             except Exception as e:
                 print(f"[DNS] Ошибка в цикле ре-резолвинга: {e}")
 
+    def _resolve_domain_subnames(self, domain: str) -> list:
+        """Для wildcard-домена резолвит несколько поддоменов, чтобы собрать больше IP"""
+        if domain.startswith("*."):
+            base = domain[2:]  # убираем *.
+            subdomains = [
+                "www." + base,
+                base,
+                "m." + base,
+                "music." + base,
+                "tv." + base,
+                "video." + base,
+                "api." + base,
+                "cdn." + base,
+            ]
+        else:
+            subdomains = [domain]
+
+        all_results = {}  # ip -> ttl
+        for sub in subdomains:
+            try:
+                results = self._resolve_a_via_doh(sub)
+                for ip, ttl in results:
+                    if ip not in all_results or ttl > all_results[ip]:
+                        all_results[ip] = ttl
+            except Exception:
+                pass
+        return [(ip, ttl) for ip, ttl in all_results.items()]
+
     def _refresh_all_managed(self):
         """Пере-резолвить все управляемые домены, обновить маршруты"""
         domains = self.store.list_domains()
@@ -64,23 +92,13 @@ class DNSServer:
         print(f"[DNS] Ре-резолвинг {len(domains)} доменов...")
         for domain in domains:
             try:
-                # Получаем текущие известные IP
                 old_ips = set(self.store.get_domain_ips(domain))
-                # Реальный домен для резолвинга (если wildcard — используем example.com)
-                resolve_name = domain.replace("*.", "www.")
-                new_ips_with_ttl = self._resolve_a_via_doh(resolve_name)
+                new_ips_with_ttl = self._resolve_domain_subnames(domain)
                 new_ips = set(ip for ip, ttl in new_ips_with_ttl)
 
                 if not new_ips:
                     continue
 
-                # IP, которые нужно удалить (были, но исчезли)
-                removed_ips = old_ips - new_ips
-                for ip in removed_ips:
-                    print(f"[DNS] IP {ip} больше не резолвится для {domain}, удаляем маршрут")
-                    self.route_manager.remove_route(ip)
-
-                # IP, которые нужно добавить (новые)
                 added_ips = new_ips - old_ips
                 for ip, ttl in new_ips_with_ttl:
                     if ip in added_ips:
@@ -89,7 +107,6 @@ class DNSServer:
                         self.route_manager.add_route(ip)
                         self.store.mark_route_added(domain, ip)
                     elif ip in old_ips:
-                        # Обновляем TTL
                         self.store.update_ip_ttl(domain, ip, ttl)
 
             except Exception as e:

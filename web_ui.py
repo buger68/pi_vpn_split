@@ -15,6 +15,7 @@ app = Flask(__name__)
 domain_store: DomainStore = None
 route_manager: RouteManager = None
 wg_manager: WireGuardManager = None
+dns_server: 'DNSServer' = None
 
 
 @app.route("/")
@@ -85,6 +86,9 @@ def api_add_domain():
     if not domain:
         return jsonify({"error": "Домен не может быть пустым"}), 400
     if domain_store.add_domain(domain):
+        # Немедленный резолвинг через фоновый поток
+        if dns_server:
+            threading.Thread(target=dns_server._refresh_all_managed, daemon=True).start()
         return jsonify({"status": "ok", "domain": domain})
     return jsonify({"error": "Домен уже существует", "domain": domain}), 409
 

@@ -70,11 +70,11 @@ def main():
     rm = RouteManager()
     wg = WireGuardManager(interface=VPN_INTERFACE)
 
+    dns = DNSServer(store, rm)
     web_ui.domain_store = store
     web_ui.route_manager = rm
     web_ui.wg_manager = wg
-
-    dns = DNSServer(store, rm)
+    web_ui.dns_server = dns
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)

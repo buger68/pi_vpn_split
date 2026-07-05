@@ -18,7 +18,7 @@ UPSTREAM_DNS = os.getenv("UPSTREAM_DNS", "8.8.8.8")
 UPSTREAM_DOH_URL = os.getenv("UPSTREAM_DOH_URL", "https://dns.quad9.net/dns-query")
 
 # Интервал ре-резолвинга управляемых доменов (в секундах)
-REFRESH_INTERVAL = int(os.getenv("REFRESH_INTERVAL", "300"))
+REFRESH_INTERVAL = int(os.getenv("REFRESH_INTERVAL", "60"))
 
 # Файл для хранения управляемых доменов (сохраняем настройки)
 DATA_FILE = os.path.join(os.path.dirname(__file__), "domains.json")
