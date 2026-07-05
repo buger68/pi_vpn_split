@@ -6,6 +6,9 @@ VPN_TABLE = "100"
 VPN_MARK = "0x01"
 IPSET_NAME = "vpn_domains"
 
+# Сообщение File exists — маршрут уже есть, это не ошибка
+FILE_EXISTS_MSG = "File exists"
+
 
 class RouteManager:
     """Управление маршрутизацией — точечные маршруты + policy routing + ipset"""
@@ -18,8 +21,12 @@ class RouteManager:
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             if result.returncode != 0:
+                err = result.stderr.strip()
+                # File exists не считается ошибкой
+                if FILE_EXISTS_MSG in err:
+                    return True
                 if check:
-                    print(f"[ROUTE] Ошибка: {' '.join(cmd)} -> {result.stderr.strip()}")
+                    print(f"[ROUTE] Ошибка: {' '.join(cmd)} -> {err}")
                 return False
             return True
         except Exception as e:
@@ -47,7 +54,7 @@ class RouteManager:
             self.active_ips.discard(ip)
             return True
 
-    def sync_routes(self, ips: set):
+    def sync_routes(self, ips: set, skip_deletes: bool = False):
         """Синхронизировать маршруты и ipset"""
         with self._lock:
             to_add = ips - self.active_ips
@@ -55,11 +62,12 @@ class RouteManager:
                 if self._run_cmd(["/usr/sbin/ip", "route", "add", ip, "dev", VPN_INTERFACE]):
                     self._run_cmd(["/usr/sbin/ipset", "add", IPSET_NAME, ip], check=False)
                     self.active_ips.add(ip)
-            to_remove = self.active_ips - ips
-            for ip in to_remove:
-                self._run_cmd(["/usr/sbin/ip", "route", "del", ip, "dev", VPN_INTERFACE], check=False)
-                self._run_cmd(["/usr/sbin/ipset", "del", IPSET_NAME, ip], check=False)
-                self.active_ips.discard(ip)
+            if not skip_deletes:
+                to_remove = self.active_ips - ips
+                for ip in to_remove:
+                    self._run_cmd(["/usr/sbin/ip", "route", "del", ip, "dev", VPN_INTERFACE], check=False)
+                    self._run_cmd(["/usr/sbin/ipset", "del", IPSET_NAME, ip], check=False)
+                    self.active_ips.discard(ip)
             print(f"[ROUTE] Синхронизация: {len(self.active_ips)} маршрутов")
 
     def get_active_routes(self) -> list:
@@ -86,8 +94,7 @@ class RouteManager:
 
     def setup_policy_routing(self, priority='4000'):
         """Настроить policy routing"""
-        print(f"[ROUTE] Настройка policy routing (приоритет {priority})...")
-
+        print(f"[ROUTE] Настройка policy routing...")
         self._run_cmd([
             "/usr/sbin/iptables", "-t", "mangle", "-C", "PREROUTING",
             "-m", "set", "--match-set", IPSET_NAME, "dst",
@@ -108,19 +115,12 @@ class RouteManager:
             "-m", "set", "--match-set", IPSET_NAME, "dst",
             "-j", "MARK", "--set-mark", VPN_MARK
         ], check=False)
-
         self._run_cmd([
             "/usr/sbin/ip", "route", "replace", "default", "dev", VPN_INTERFACE, "table", VPN_TABLE
         ])
-
         self._run_cmd(["/usr/sbin/ip", "rule", "del", "fwmark", VPN_MARK, "table", VPN_TABLE], check=False)
-        self._run_cmd(["/usr/sbin/ip", "rule", "del", "priority", priority], check=False)
-        self._run_cmd([
-            "/usr/sbin/ip", "rule", "add", "fwmark", VPN_MARK, "table", VPN_TABLE,
-            "priority", priority
-        ])
-
-        print(f"[ROUTE] Policy routing настроен: mark={VPN_MARK}, table={VPN_TABLE}, priority={priority}")
+        self._run_cmd(["/usr/sbin/ip", "rule", "add", "fwmark", VPN_MARK, "table", VPN_TABLE, "priority", priority])
+        print(f"[ROUTE] Policy routing настроен: mark={VPN_MARK}, table={VPN_TABLE}")
 
     def cleanup_policy_routing(self):
         self._run_cmd(["/usr/sbin/ip", "rule", "del", "fwmark", VPN_MARK, "table", VPN_TABLE], check=False)
